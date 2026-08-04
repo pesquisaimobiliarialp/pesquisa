@@ -22,25 +22,35 @@ ARQUIVO_DB = "imobiliarias_cadastradas.csv"
 
 def carregar_imobiliarias():
   if os.path.exists(ARQUIVO_DB):
-    return pd.read_csv(ARQUIVO_DB)
-  else:
-    df_inicial = pd.DataFrame(
-        {
-            "Nome da Imobiliária": [
-                "IMOBILIÁRIA TOLEDO",
-                "LIDER IMOBILIÁRIA",
-                "FARINA IMOBILIÁRIA",
-            ],
-            "Telefone": ["(14) 3263-0187", "(14) 3264-3343", "(14) 3263-0000"],
-            "Site / Link": [
-                "https://www.toledoimoveis.com.br",
-                "https://liderlp.com.br",
-                "https://www.farinaimobiliaria.com.br",
-            ],
-        }
-    )
-    df_inicial.to_csv(ARQUIVO_DB, index=False)
-    return df_inicial
+    try:
+      df = pd.read_csv(ARQUIVO_DB)
+      # Garante que as colunas essenciais existam, mesmo se o arquivo antigo for carregado
+      if "Telefone" not in df.columns:
+        df["Telefone"] = ""
+      if "Site / Link" not in df.columns:
+        df["Site / Link"] = ""
+      return df
+    except Exception:
+      pass
+
+  # Padrão inicial caso o arquivo não exista ou esteja corrompido
+  df_inicial = pd.DataFrame(
+      {
+          "Nome da Imobiliária": [
+              "IMOBILIÁRIA TOLEDO",
+              "LIDER IMOBILIÁRIA",
+              "FARINA IMOBILIÁRIA",
+          ],
+          "Telefone": ["(14) 3263-0187", "(14) 3264-3343", "(14) 3263-0000"],
+          "Site / Link": [
+              "https://www.toledoimoveis.com.br",
+              "https://liderlp.com.br",
+              "https://www.farinaimobiliaria.com.br",
+          ],
+      }
+  )
+  df_inicial.to_csv(ARQUIVO_DB, index=False)
+  return df_inicial
 
 
 if "imobiliarias" not in st.session_state:
@@ -113,11 +123,11 @@ with aba1:
     for idx, row in df_imobs.iterrows():
       c_a, c_b, c_c, c_d = st.columns([3, 2, 4, 1])
       with c_a:
-        st.write(f"**{row['Nome da Imobiliária']}**")
+        st.write(f"**{row.get('Nome da Imobiliária', 'N/D')}**")
       with c_b:
-        st.write(row["Telefone"])
+        st.write(row.get("Telefone", ""))
       with c_c:
-        st.write(row["Site / Link"])
+        st.write(row.get("Site / Link", ""))
       with c_d:
         if st.button("🗑️ Excluir", key=f"del_imob_{idx}"):
           st.session_state["imobiliarias"] = df_imobs.drop(idx).reset_index(
@@ -143,16 +153,18 @@ with aba2:
       else ["Cadastre imobiliárias na Aba 1"]
   )
 
-  # Seção de Atalhos de Consulta Rápida
   if not df_imobs.empty:
     st.markdown("### 🌐 Atalhos Rápidos para Acessar os Portais:")
     cols_links = st.columns(len(df_imobs))
     for i, row in df_imobs.iterrows():
-      link = row["Site / Link"]
+      link = row.get("Site / Link", "")
       if link and not link.startswith("http"):
         link = "https://" + link
       with cols_links[i % len(cols_links)]:
-        st.markdown(f"👉 **[{row['Nome da Imobiliária']}]({link})**")
+        if link:
+          st.markdown(f"👉 **[{row.get('Nome da Imobiliária')}]({link})**")
+        else:
+          st.markdown(f"👉 **{row.get('Nome da Imobiliária')}** (Sem link)")
 
   st.markdown("---")
   st.subheader("📝 Lançamento da Amostra Encontrada")
@@ -161,7 +173,6 @@ with aba2:
     col_f1, col_f2 = st.columns(2)
 
     with col_f1:
-      # Número automático da amostra sequencial
       num_amostra = len(st.session_state["amostras_laudo"]) + 1
       st.markdown(f"### 📍 Amostra Número: **{num_amostra}**")
 
@@ -203,7 +214,6 @@ with aba2:
       if informante_escolhido == "Cadastre imobiliárias na Aba 1":
         st.error("Cadastre uma imobiliária antes de registrar.")
       else:
-        # Busca o telefone correspondente no banco de dados cadastrado
         tel_encontrado = ""
         if not df_imobs.empty:
           match_tel = df_imobs.loc[
@@ -213,7 +223,6 @@ with aba2:
           if not match_tel.empty:
             tel_encontrado = match_tel.values[0]
 
-        # Cálculo automático exato do Valor Unitário exigido pelo laudo
         val_unitario = (
             (valor_total_in / area_terreno_in)
             if area_terreno_in and area_terreno_in > 0
