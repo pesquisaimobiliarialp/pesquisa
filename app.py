@@ -180,7 +180,7 @@ with aba2:
         ):
           try:
             genai.configure(api_key=st.session_state["api_key_salva"])
-            # Atualizado para o modelo flash moderno correto
+            # Atualizado para o modelo gemini-2.0-flash correto
             model = genai.GenerativeModel("gemini-2.0-flash")
 
             novas_amostras = []
@@ -194,7 +194,7 @@ with aba2:
               prompt_instrucao = f"""
                             Atue como um Engenheiro de Avaliações Imobiliárias. 
                             Analise o contexto da imobiliária '{imob_nome}' ({site_url}) para imóveis do tipo '{tipo_busca}' na cidade '{cidade_busca}' e bairros '{bairros_busca}'.
-                            Traga exemplos consistentes e reais de mercado para a região informada contendo:
+                            Traga exemplos consistentes de mercado para a região informada contendo:
                             - Ref (código do imóvel)
                             - Valor Total numérico
                             - Tamanho em m² numérico
