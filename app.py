@@ -187,7 +187,7 @@ with aba2:
             # Configura a API real do Gemini com a chave memorizada
             genai.configure(api_key=st.session_state["api_key_salva"])
             # Usando o modelo flash padrão para leitura eficiente
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash")
 
             # Varredura inteligente de links das imobiliárias escolhidas
             novas_amostras = []
