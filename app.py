@@ -1,18 +1,17 @@
 from datetime import date
 import os
-import google.generativeai as genai
 import pandas as pd
 import streamlit as st
 
 # Configuração da Página
 st.set_page_config(
-    page_title="App de Pesquisa Imobiliária com IA", page_icon="🏢", layout="wide"
+    page_title="Sistema de Avaliação Imobiliária", page_icon="🏢", layout="wide"
 )
 
-st.title("🏢 Sistema de Pesquisa e Avaliação Imobiliária com IA")
+st.title("🏢 Sistema de Organização e Quadro para Laudos Imobiliários")
 st.write(
-    "Gerencie seu banco de imobiliárias, execute buscas automatizadas e gere"
-    " quadros técnicos consistentes para laudos."
+    "Gerencie suas fontes, consulte portais e consolide de forma limpa e"
+    " estável as amostras para as suas avaliações."
 )
 
 # Arquivo de Banco de Dados Local para Imobiliárias
@@ -44,6 +43,9 @@ if "relatorio_laudo" not in st.session_state:
       columns=[
           "Informante",
           "Data",
+          "Cidade",
+          "Bairro",
+          "Tipo",
           "Ref",
           "Valor Total (R$)",
           "Tamanho (m²)",
@@ -53,32 +55,11 @@ if "relatorio_laudo" not in st.session_state:
       ]
   )
 
-# --- GERENCIAMENTO DA CHAVE DE API ---
-if "api_key_salva" not in st.session_state:
-  st.session_state["api_key_salva"] = st.secrets.get("GOOGLE_API_KEY", "")
-
-with st.sidebar:
-  st.header("🔑 Configuração da Chave de IA")
-  chave_input = st.text_input(
-      "Chave de API do Google AI Studio",
-      value=st.session_state["api_key_salva"],
-      type="password",
-      help=(
-          "Cole sua chave uma vez. Ela ficará memorizada durante sua sessão"
-          " ativa."
-      ),
-  )
-  if chave_input:
-    st.session_state["api_key_salva"] = chave_input
-    st.success("Chave de API configurada e memorizada!")
-  else:
-    st.warning("Insira sua chave gratuita (aistudio.google.com).")
-
 # --- ABAS DO APLICATIVO ---
 aba1, aba2, aba3 = st.tabs(
     [
         "📥 Cadastro de Imobiliárias",
-        "🔍 Agente de Pesquisa",
+        "🔍 Consulta e Registro de Amostras",
         "📊 Quadro Consolidado (Laudo)",
     ]
 )
@@ -87,8 +68,7 @@ aba1, aba2, aba3 = st.tabs(
 with aba1:
   st.header("Gerenciamento do Banco de Dados de Imobiliárias")
   st.write(
-      "Cadastre novas fontes ou exclua imobiliárias que não deseja mais"
-      " consultar."
+      "Cadastre novas fontes de pesquisa ou remova as que não utiliza mais."
   )
 
   with st.form("form_cad_imob", clear_on_submit=True):
@@ -107,7 +87,7 @@ with aba1:
           [st.session_state["imobiliarias"], nova_linha], ignore_index=True
       )
       st.session_state["imobiliarias"].to_csv(ARQUIVO_DB, index=False)
-      st.success(f"Imobiliária '{novo_nome}' cadastrada com sucesso!")
+      st.success(f"Imobiliária '{novo_nome}' cadastrada e salva com sucesso!")
       st.rerun()
 
   st.markdown("---")
@@ -132,115 +112,139 @@ with aba1:
   else:
     st.info("Nenhuma imobiliária cadastrada.")
 
-# --- ABA 2: AGENTE DE PESQUISA COM IA ---
+# --- ABA 2: CONSULTA AOS PORTAIS E REGISTRO DE DADOS ---
 with aba2:
-  st.header("🤖 Agente Inteligente de Extração de Amostras")
+  st.header("🔍 Acesso Rápido aos Portais e Registro de Amostras")
   st.write(
-      "Selecione os portais, informe os bairros em Lençóis Paulista e deixe o"
-      " agente estruturar os dados para o seu laudo."
+      "Abra os portais cadastrados para pesquisa visual e preencha os dados"
+      " coletados para o laudo."
   )
 
-  lista_nomes_imob = st.session_state["imobiliarias"][
-      "Nome da Imobiliária"
-  ].tolist()
+  df_imobs = st.session_state["imobiliarias"]
+  lista_nomes_imob = df_imobs["Nome da Imobiliária"].tolist()
 
-  with st.form("form_pesquisa_ia"):
-    imobs_escolhidas = st.multiselect(
-        "Selecione a(s) Imobiliária(s) para Análise", lista_nomes_imob
+  if not df_imobs.empty:
+    st.subheader(
+        "🌐 Atalhos para Consulta Direta nos Sites (Clique para abrir):"
     )
-
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-      cidade_busca = st.text_input("Cidade", value="Lençóis Paulista")
-      bairros_busca = st.text_input(
-          "Bairros de Interesse (ex: Centro, Jardim América)",
-          value="Centro",
+    for index, row in df_imobs.iterrows():
+      link = row["Site / Link"]
+      if link and not link.startswith("http"):
+        link = "https://" + link
+      st.markdown(
+          f"- 🔗 **[{row['Nome da Imobiliária']}]({link})** — *Abrir portal"
+          " para verificar ofertas.*"
       )
-    with col_p2:
-      tipo_busca = st.selectbox(
-          "Tipo de Imóvel", ["Residencial", "Comercial", "Terreno", "Industrial"]
+
+  st.markdown("---")
+  st.subheader("📝 Registrar Amostra Encontrada na Pesquisa")
+
+  with st.form("form_registro_amostra", clear_on_submit=False):
+    col_r1, col_r2 = st.columns(2)
+
+    with col_r1:
+      informante = st.selectbox(
+          "Informante (Imobiliária de Origem)",
+          (
+              lista_nomes_imob
+              if lista_nomes_imob
+              else ["Cadastre uma imobiliária na Aba 1"]
+          ),
       )
       data_pesquisa = st.date_input("Data da Coleta")
+      cidade = st.text_input("Cidade", value="Lençóis Paulista")
+      bairro = st.text_input("Bairro")
+      tipo_imovel = st.selectbox(
+          "Tipo de Imóvel", ["Residencial", "Comercial", "Terreno", "Industrial"]
+      )
 
-    btn_rodar_agente = st.form_submit_button(
-        "🚀 INICIAR PESQUISA E EXTRAÇÃO COM IA"
+    with col_r2:
+      ref_imovel = st.text_input("Ref. (Código do imóvel no site)")
+      valor_total = st.number_input(
+          "Valor Total (R$)", min_value=0.0, format="%.2f"
+      )
+      tamanho = st.number_input(
+          "Tamanho / Área (m²)", min_value=0.1, format="%.2f"
+      )
+      topografia = st.selectbox(
+          "Topografia (Verificada na Imagem)",
+          ["Plano", "Aclive", "Declive", "Irregular", "Não identificada"],
+      )
+      link_foto = st.text_input("Link da Imagem ou URL do Anúncio")
+
+    btn_adicionar = st.form_submit_button(
+        "➕ Adicionar Imóvel ao Quadro de Laudo"
     )
 
-    if btn_rodar_agente:
-      if not st.session_state["api_key_salva"]:
+    if btn_adicionar:
+      if informante == "Cadastre uma imobiliária na Aba 1":
         st.error(
-            "Por favor, insira e salve sua Chave de API do Gemini na barra"
-            " lateral esquerda."
+            "Cadastre pelo menos uma imobiliária antes de registrar amostras."
         )
-      elif not imobs_escolhidas:
-        st.error("Selecione pelo menos uma imobiliária.")
       else:
-        with st.spinner(
-            "Conectando aos portais e estruturando a base para o laudo..."
-        ):
-          try:
-            genai.configure(api_key=st.session_state["api_key_salva"])
-            # Atualizado para o modelo gemini-2.0-flash correto
-            model = genai.GenerativeModel("gemini-2.0-flash")
+        # Cálculo técnico automático do Valor Unitário
+        valor_unitario = (
+            (valor_total / tamanho) if tamanho and tamanho > 0 else 0.0
+        )
 
-            novas_amostras = []
-            for imob_nome in imobs_escolhidas:
-              site_url = st.session_state["imobiliarias"].loc[
-                  st.session_state["imobiliarias"]["Nome da Imobiliária"]
-                  == imob_nome,
-                  "Site / Link",
-              ].values[0]
+        nova_amostra = pd.DataFrame({
+            "Informante": [informante],
+            "Data": [str(data_pesquisa)],
+            "Cidade": [cidade],
+            "Bairro": [bairro],
+            "Tipo": [tipo_imovel],
+            "Ref": [ref_imovel],
+            "Valor Total (R$)": [f"R$ {valor_total:,.2f}"],
+            "Tamanho (m²)": [f"{tamanho:,.2f}"],
+            "Valor Unitário (R$/m²)": [f"R$ {valor_unitario:,.2f}"],
+            "Topografia": [topografia],
+            "Link/Foto": [link_foto],
+        })
 
-              prompt_instrucao = f"""
-                            Atue como um Engenheiro de Avaliações Imobiliárias. 
-                            Analise o contexto da imobiliária '{imob_nome}' ({site_url}) para imóveis do tipo '{tipo_busca}' na cidade '{cidade_busca}' e bairros '{bairros_busca}'.
-                            Traga exemplos consistentes de mercado para a região informada contendo:
-                            - Ref (código do imóvel)
-                            - Valor Total numérico
-                            - Tamanho em m² numérico
-                            - Topografia avaliada (Plano, Aclive, etc.)
-                            """
+        st.session_state["relatorio_laudo"] = pd.concat(
+            [st.session_state["relatorio_laudo"], nova_amostra],
+            ignore_index=True,
+        )
+        st.success("Imóvel adicionado com sucesso ao quadro de laudo!")
 
-              response = model.generate_content(prompt_instrucao)
-
-              novas_amostras.append({
-                  "Informante": imob_nome,
-                  "Data": str(data_pesquisa),
-                  "Ref": "REF-WEB-01",
-                  "Valor Total (R$)": "R$ 450.000,00",
-                  "Tamanho (m²)": "250,00",
-                  "Valor Unitário (R$/m²)": "R$ 1.800,00",
-                  "Topografia": "Plano (Validado pelo Agente)",
-                  "Link/Foto": site_url,
-              })
-
-            df_novos_dados = pd.DataFrame(novas_amostras)
-            st.session_state["relatorio_laudo"] = pd.concat(
-                [st.session_state["relatorio_laudo"], df_novos_dados],
-                ignore_index=True,
-            )
-            st.success("✨ Busca executada com sucesso!")
-
-          except Exception as e:
-            st.error(
-                f"Ocorreu um erro ao processar com a IA. Detalhe técnico: {e}"
-            )
-
-# --- ABA 3: QUADRO DE LAUDO ---
+# --- ABA 3: QUADRO CONSOLIDADO PARA LAUDO ---
 with aba3:
   st.header("📊 Quadro Consolidado de Amostras para Laudo")
-  st.write("Tabela final formatada de acordo com as normas técnicas.")
+  st.write(
+      "Abaixo estão consolidados os dados estruturados para fundamentar a sua"
+      " avaliação imobiliária."
+  )
 
   if not st.session_state["relatorio_laudo"].empty:
-    st.dataframe(
-        st.session_state["relatorio_laudo"], use_container_width=True
-    )
+    # Filtros visuais dinâmicos para facilitar a análise
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+      filtro_tipo = st.selectbox(
+          "Filtrar por Tipo:",
+          ["Todos", "Residencial", "Comercial", "Terreno", "Industrial"],
+      )
+    with col_f2:
+      lista_infs = ["Todos"] + st.session_state["relatorio_laudo"][
+          "Informante"
+      ].unique().tolist()
+      filtro_inf = st.selectbox("Filtrar por Imobiliária:", lista_infs)
+
+    df_exibir = st.session_state["relatorio_laudo"]
+    if filtro_tipo != "Todos":
+      df_exibir = df_exibir[df_exibir["Tipo"] == filtro_tipo]
+    if filtro_inf != "Todos":
+      df_exibir = df_exibir[df_exibir["Informante"] == filtro_inf]
+
+    st.dataframe(df_exibir, use_container_width=True)
 
     if st.button("Limpar Quadro Consolidado"):
       st.session_state["relatorio_laudo"] = pd.DataFrame(
           columns=[
               "Informante",
               "Data",
+              "Cidade",
+              "Bairro",
+              "Tipo",
               "Ref",
               "Valor Total (R$)",
               "Tamanho (m²)",
@@ -251,4 +255,7 @@ with aba3:
       )
       st.rerun()
   else:
-    st.info("Nenhum dado consolidado ainda.")
+    st.info(
+        "Nenhum imóvel registrado no quadro ainda. Vá até a Aba 2 para consultar"
+        " os portais e registrar as amostras."
+    )
