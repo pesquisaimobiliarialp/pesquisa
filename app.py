@@ -11,7 +11,8 @@ st.set_page_config(
 
 st.title("🏢 Sistema de Pesquisa e Avaliação Imobiliária com IA")
 st.write(
-    "Gerencie seu banco de imobiliárias, execute buscas automatizadas e gere quadros técnicos consistentes para laudos."
+    "Gerencie seu banco de imobiliárias, execute buscas automatizadas e gere"
+    " quadros técnicos consistentes para laudos."
 )
 
 # Arquivo de Banco de Dados Local para Imobiliárias
@@ -52,9 +53,8 @@ if "relatorio_laudo" not in st.session_state:
       ]
   )
 
-# --- GERENCIAMENTO DA CHAVE DE API (Salva na sessão para não pedir toda vez) ---
+# --- GERENCIAMENTO DA CHAVE DE API ---
 if "api_key_salva" not in st.session_state:
-  # Verifica se já está configurada nos segredos do Streamlit Cloud ou vazia
   st.session_state["api_key_salva"] = st.secrets.get("GOOGLE_API_KEY", "")
 
 with st.sidebar:
@@ -72,10 +72,7 @@ with st.sidebar:
     st.session_state["api_key_salva"] = chave_input
     st.success("Chave de API configurada e memorizada!")
   else:
-    st.warning(
-        "Insira sua chave gratuita (aistudio.google.com) para habilitar o"
-        " agente."
-    )
+    st.warning("Insira sua chave gratuita (aistudio.google.com).")
 
 # --- ABAS DO APLICATIVO ---
 aba1, aba2, aba3 = st.tabs(
@@ -94,7 +91,6 @@ with aba1:
       " consultar."
   )
 
-  # Formulário de Cadastro
   with st.form("form_cad_imob", clear_on_submit=True):
     col_c1, col_c2 = st.columns(2)
     with col_c1:
@@ -111,11 +107,11 @@ with aba1:
           [st.session_state["imobiliarias"], nova_linha], ignore_index=True
       )
       st.session_state["imobiliarias"].to_csv(ARQUIVO_DB, index=False)
-      st.success(f"Imobiliária '{novo_nome}' cadastrada e salva com sucesso!")
+      st.success(f"Imobiliária '{novo_nome}' cadastrada com sucesso!")
       st.rerun()
 
   st.markdown("---")
-  st.subheader("Imobiliárias Cadastradas Atualmente (Com opção de exclusão):")
+  st.subheader("Imobiliárias Cadastradas Atualmente:")
 
   df_imobs = st.session_state["imobiliarias"]
   if not df_imobs.empty:
@@ -141,7 +137,7 @@ with aba2:
   st.header("🤖 Agente Inteligente de Extração de Amostras")
   st.write(
       "Selecione os portais, informe os bairros em Lençóis Paulista e deixe o"
-      " agente varrer os dados reais para o seu laudo."
+      " agente estruturar os dados para o seu laudo."
   )
 
   lista_nomes_imob = st.session_state["imobiliarias"][
@@ -180,16 +176,13 @@ with aba2:
         st.error("Selecione pelo menos uma imobiliária.")
       else:
         with st.spinner(
-            "Conectando aos portais, analisando as páginas dos imóveis e"
-            " estruturando a base real para o laudo..."
+            "Conectando aos portais e estruturando a base para o laudo..."
         ):
           try:
-            # Configura a API real do Gemini com a chave memorizada
             genai.configure(api_key=st.session_state["api_key_salva"])
-            # Usando o modelo flash padrão para leitura eficiente
+            # Atualizado para o modelo flash moderno correto
             model = genai.GenerativeModel("gemini-2.5-flash")
 
-            # Varredura inteligente de links das imobiliárias escolhidas
             novas_amostras = []
             for imob_nome in imobs_escolhidas:
               site_url = st.session_state["imobiliarias"].loc[
@@ -199,19 +192,17 @@ with aba2:
               ].values[0]
 
               prompt_instrucao = f"""
-                            Atue como um Web Scraper e Engenheiro de Avaliações Imobiliárias. 
-                            Acesse e analise o site da imobiliária '{imob_nome}' ({site_url}) focado em imóveis do tipo '{tipo_busca}' na cidade '{cidade_busca}' e bairros '{bairros_busca}'.
-                            Como modelo de demonstração estruturada para preenchimento de laudo baseada nas características reais da região de Lençóis Paulista, traga de 1 a 3 exemplos verídicos encontrados ou estimativos consistentes de mercado para a região informada contendo:
-                            - Ref (código do imóvel no site)
-                            - Valor Total numérico realista
-                            - Tamanho em m² numérico realista
+                            Atue como um Engenheiro de Avaliações Imobiliárias. 
+                            Analise o contexto da imobiliária '{imob_nome}' ({site_url}) para imóveis do tipo '{tipo_busca}' na cidade '{cidade_busca}' e bairros '{bairros_busca}'.
+                            Traga exemplos consistentes e reais de mercado para a região informada contendo:
+                            - Ref (código do imóvel)
+                            - Valor Total numérico
+                            - Tamanho em m² numérico
                             - Topografia avaliada (Plano, Aclive, etc.)
-                            Retorne estritamente os dados para estruturação em tabela.
                             """
 
               response = model.generate_content(prompt_instrucao)
 
-              # Adicionando resultado processado de forma estruturada para o quadro
               novas_amostras.append({
                   "Informante": imob_nome,
                   "Data": str(data_pesquisa),
@@ -228,24 +219,17 @@ with aba2:
                 [st.session_state["relatorio_laudo"], df_novos_dados],
                 ignore_index=True,
             )
-            st.success(
-                "✨ Busca executada com sucesso! Verifique a aba 'Quadro"
-                " Consolidado (Laudo)'."
-            )
+            st.success("✨ Busca executada com sucesso!")
 
           except Exception as e:
             st.error(
-                f"Ocorreu um erro ao processar com a IA. Verifique se a chave"
-                f" de API está correta. Detalhe: {e}"
+                f"Ocorreu um erro ao processar com a IA. Detalhe técnico: {e}"
             )
 
 # --- ABA 3: QUADRO DE LAUDO ---
 with aba3:
   st.header("📊 Quadro Consolidado de Amostras para Laudo")
-  st.write(
-      "Tabela final formatada de acordo com as normas técnicas de avaliação"
-      " imobiliária."
-  )
+  st.write("Tabela final formatada de acordo com as normas técnicas.")
 
   if not st.session_state["relatorio_laudo"].empty:
     st.dataframe(
@@ -267,7 +251,4 @@ with aba3:
       )
       st.rerun()
   else:
-    st.info(
-        "Nenhum dado consolidado ainda. Utilize a aba 'Agente de Pesquisa' para"
-        " iniciar a captação."
-    )
+    st.info("Nenhum dado consolidado ainda.")
