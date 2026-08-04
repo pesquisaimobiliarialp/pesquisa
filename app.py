@@ -1,3 +1,4 @@
+from datetime import date
 import pandas as pd
 import streamlit as st
 
@@ -8,7 +9,7 @@ st.set_page_config(
 
 st.title("🏢 Sistema de Pesquisa e Avaliação Imobiliária")
 st.write(
-    "Cadastre imobiliárias, faça buscas direcionadas e gere o quadro de dados para suas avaliações."
+    "Gerencie imobiliárias, filtre por bairros e tipo em Lençóis Paulista, e consolide o quadro técnico para laudos."
 )
 
 # Criando abas para organizar o aplicativo
@@ -16,19 +17,15 @@ aba1, aba2, aba3 = st.tabs(
     ["📥 Cadastro de Imobiliárias", "🔍 Pesquisa de Imóveis", "📊 Quadro de Laudo"]
 )
 
-# Inicializando a "memória" do aplicativo para salvar os dados temporariamente
+# Inicializando a "memória" do aplicativo (banco de dados temporário)
 if "imobiliarias" not in st.session_state:
     st.session_state["imobiliarias"] = pd.DataFrame(
         {
-            "Nome da Imobiliária": [
-                "Exemplo Imóveis",
-                "Imobiliária Central",
-            ],
+            "Nome da Imobiliária": ["Concreto Imóveis", "Lider LP"],
             "Site / Link": [
-                "https://www.exemploimoveis.com.br",
-                "https://www.centralimoveis.com",
+                "https://www.concretoimoveis.com.br",
+                "https://liderlp.com.br",
             ],
-            "Região Padrão": ["Centro", "Zona Sul"],
         }
     )
 
@@ -37,6 +34,9 @@ if "resultados_pesquisa" not in st.session_state:
         columns=[
             "Informante",
             "Data",
+            "Cidade",
+            "Bairro",
+            "Tipo",
             "Ref",
             "Valor Total (R$)",
             "Tamanho (m²)",
@@ -56,7 +56,6 @@ with aba1:
     with st.form("form_imobiliaria"):
         novo_nome = st.text_input("Nome da Imobiliária")
         novo_site = st.text_input("Link ou Site da Imobiliária")
-        regiao_padrao = st.text_input("Região Principal de Atuação")
         submit_cad = st.form_submit_button("Cadastrar Imobiliária")
 
         if submit_cad and novo_nome:
@@ -64,7 +63,6 @@ with aba1:
                 {
                     "Nome da Imobiliária": [novo_nome],
                     "Site / Link": [novo_site],
-                    "Região Padrão": [regiao_padrao],
                 }
             )
             st.session_state["imobiliarias"] = pd.concat(
@@ -77,77 +75,171 @@ with aba1:
 
 # --- ABA 2: PESQUISA DE IMÓVEIS ---
 with aba2:
-    st.header("Formulário de Pesquisa de Imóvel")
-    st.write("Preencha os dados coletados do imóvel para adicionar ao quadro.")
+    st.header("Filtros e Coleta de Imóveis")
+    st.write(
+        "Defina os filtros de busca e adicione os imóveis encontrados por imobiliária."
+    )
 
-    # Pega as imobiliárias cadastradas para o menu suspenso
     lista_nomes_imob = st.session_state["imobiliarias"][
         "Nome da Imobiliária"
     ].tolist()
 
     with st.form("form_pesquisa"):
+        st.subheader("1. Critérios de Busca")
+        col_f1, col_f2 = st.columns(2)
+
+        with col_f1:
+            imobiliarias_selecionadas = st.multiselect(
+                "Selecionar Imobiliárias para a Consulta", lista_nomes_imob
+            )
+            cidade = st.text_input("Cidade (Fixa)", value="Lençóis Paulista")
+
+        with col_f2:
+            bairros_opcoes = [
+                "Centro",
+                "Jardim Carolina",
+                "Vila Irineu",
+                "Jardim América",
+                "Parque Residencial",
+                "Vila Nova",
+                "Outro",
+            ]
+            bairros_selecionados = st.multiselect(
+                "Bairros (Selecione um ou mais)", bairros_opcoes
+            )
+            tipo_imovel = st.selectbox(
+                "Tipo de Imóvel", ["Terreno", "Casa", "Comercial", "Industrial"]
+            )
+
+        st.markdown("---")
+        st.subheader("2. Registrar Imóvel Encontrado")
         col1, col2 = st.columns(2)
+
         with col1:
-            informante = st.selectbox("Informante (Imobiliária)", lista_nomes_imob)
+            informante_atual = st.selectbox(
+                "Imobiliária de Origem deste Imóvel",
+                (
+                    imobiliarias_selecionadas
+                    if imobiliarias_selecionadas
+                    else ["Selecione imobiliárias acima primeiro"]
+                ),
+            )
             data_pesquisa = st.date_input("Data da Pesquisa")
+            bairro_especifico = st.text_input(
+                "Bairro do Imóvel (ou confirme a seleção dos filtros)"
+            )
             ref_imovel = st.text_input("Ref. (Número de Publicação / Código)")
+
+        with col2:
             valor_total = st.number_input(
                 "Valor Total (R$)", min_value=0.0, format="%.2f"
             )
-
-        with col2:
-            tamanho = st.number_input("Tamanho / Área (m²)", min_value=0.1)
+            tamanho = st.number_input(
+                "Tamanho / Área (m²)", min_value=0.1, format="%.2f"
+            )
             topografia = st.selectbox(
                 "Topografia (Verificada na Imagem)",
                 ["Plano", "Aclive", "Declive", "Irregular", "Não identificada"],
             )
             link_foto = st.text_input("Link da Imagem ou do Anúncio")
 
-        submit_pesq = st.form_submit_button("Adicionar Imóvel ao Quadro")
+        submit_pesq = st.form_submit_button(
+            "Adicionar Imóvel ao Quadro Consolidado"
+        )
 
         if submit_pesq:
-            if tamanho > 0:
-                valor_unitario = valor_total / tamanho
+            if not imobiliarias_selecionadas:
+                st.error(
+                    "Selecione pelo menos uma imobiliária no topo da pesquisa."
+                )
+            elif (
+                informante_atual
+                == "Selecione imobiliárias acima primeiro"
+            ):
+                st.error("Escolha a imobiliária de origem válida para o imóvel.")
             else:
-                valor_unitario = 0.0
+                if tamanho > 0:
+                    valor_unitario = valor_total / tamanho
+                else:
+                    valor_unitario = 0.0
 
-            novo_registro = pd.DataFrame(
-                {
-                    "Informante": [informante],
-                    "Data": [str(data_pesquisa)],
-                    "Ref": [ref_imovel],
-                    "Valor Total (R$)": [f"R$ {valor_total:,.2f}"],
-                    "Tamanho (m²)": [f"{tamanho:,.2f}"],
-                    "Valor Unitário (R$/m²)": [f"R$ {valor_unitario:,.2f}"],
-                    "Topografia": [topografia],
-                    "Link/Foto": [link_foto],
-                }
-            )
+                bairro_final = (
+                    bairro_especifico
+                    if bairro_especifico
+                    else (
+                        ", ".join(bairros_selecionados)
+                        if bairros_selecionados
+                        else "Geral"
+                    )
+                )
 
-            st.session_state["resultados_pesquisa"] = pd.concat(
-                [st.session_state["resultados_pesquisa"], novo_registro],
-                ignore_index=True,
-            )
-            st.success("Imóvel adicionado com sucesso ao quadro de laudo!")
+                novo_registro = pd.DataFrame(
+                    {
+                        "Informante": [informante_atual],
+                        "Data": [str(data_pesquisa)],
+                        "Cidade": [cidade],
+                        "Bairro": [bairro_final],
+                        "Tipo": [tipo_imovel],
+                        "Ref": [ref_imovel],
+                        "Valor Total (R$)": [f"R$ {valor_total:,.2f}"],
+                        "Tamanho (m²)": [f"{tamanho:,.2f}"],
+                        "Valor Unitário (R$/m²)": [f"R$ {valor_unitario:,.2f}"],
+                        "Topografia": [topografia],
+                        "Link/Foto": [link_foto],
+                    }
+                )
+
+                st.session_state["resultados_pesquisa"] = pd.concat(
+                    [st.session_state["resultados_pesquisa"], novo_registro],
+                    ignore_index=True,
+                )
+                st.success(
+                    "Imóvel adicionado com sucesso ao quadro de laudo!"
+                )
 
 # --- ABA 3: QUADRO DE LAUDO ---
 with aba3:
-    st.header("Quadro de Dados para Avaliação Imobiliária")
+    st.header("📊 Quadro Consolidado para Avaliação Imobiliária")
     st.write(
-        "Abaixo está consolidado o quadro formatado para embasar o seu laudo técnico."
+        "Abaixo estão listados todos os imóveis cadastrados que atendem aos critérios das imobiliárias e filtros selecionados."
     )
 
     if not st.session_state["resultados_pesquisa"].empty:
-        st.dataframe(
-            st.session_state["resultados_pesquisa"], use_container_width=True
-        )
+        # Filtros interativos para visualização no quadro
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            filtro_tipo = st.selectbox(
+                "Filtrar por Tipo no Quadro:",
+                ["Todos", "Terreno", "Casa", "Comercial", "Industrial"],
+            )
+        with col_m2:
+            imobs_disponiveis = [
+                "Todas"
+            ] + st.session_state["resultados_pesquisa"][
+                "Informante"
+            ].unique().tolist()
+            filtro_imob = st.selectbox(
+                "Filtrar por Imobiliária (Informante):", imobs_disponiveis
+            )
 
-        # Botão para limpar dados se necessário
-        if st.button("Limpar Quadro de Pesquisa"):
+        df_exibir = st.session_state["resultados_pesquisa"]
+
+        if filtro_tipo != "Todos":
+            df_exibir = df_exibir[df_exibir["Tipo"] == filtro_tipo]
+
+        if filtro_imob != "Todas":
+            df_exibir = df_exibir[df_exibir["Informante"] == filtro_imob]
+
+        st.dataframe(df_exibir, use_container_width=True)
+
+        if st.button("Limpar Quadro Consolidado"):
             st.session_state["resultados_pesquisa"] = pd.DataFrame(
                 columns=[
                     "Informante",
                     "Data",
+                    "Cidade",
+                    "Bairro",
+                    "Tipo",
                     "Ref",
                     "Valor Total (R$)",
                     "Tamanho (m²)",
@@ -158,6 +250,6 @@ with aba3:
             )
             st.rerun()
     else:
-        info = st.info(
-            "Nenhum imóvel cadastrado na pesquisa ainda. Vá até a aba 'Pesquisa de Imóveis' para preencher os dados."
+        st.info(
+            "Nenhum imóvel registrado ainda. Vá até a aba 'Pesquisa de Imóveis' para cadastrar os dados coletados."
         )
