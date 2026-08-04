@@ -181,7 +181,7 @@ with aba2:
           try:
             genai.configure(api_key=st.session_state["api_key_salva"])
             # Atualizado para o modelo flash moderno correto
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            model = genai.GenerativeModel("gemini-2.0-flash")
 
             novas_amostras = []
             for imob_nome in imobs_escolhidas:
